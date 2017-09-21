@@ -113,9 +113,8 @@ subclass's constructor can take any number of arguments of any type. The generic
 
 FlowLogic annotations
 ---------------------
-Any flow that you wish to start either directly via RPC or as a subflow must be annotated with the
-``@InitiatingFlow`` annotation. Additionally, if you wish to start the flow via RPC, you must annotate it with the
-``@StartableByRPC`` annotation:
+Any flow from which you want to initiate other flows must be annotated with the ``@InitiatingFlow`` annotation.
+Additionally, if you wish to start the flow via RPC, you must annotate it with the ``@StartableByRPC`` annotation:
 
 .. container:: codeset
 
@@ -139,7 +138,7 @@ Meanwhile, any flow that responds to a message from another flow must be annotat
    .. sourcecode:: kotlin
 
         @InitiatedBy(Initiator::class)
-        class Responder(val otherParty: Party) : FlowLogic<Unit>() { }
+        class Responder(val otherSideSession: FlowSession) : FlowLogic<Unit>() { }
 
    .. sourcecode:: java
 
@@ -270,18 +269,50 @@ Finally, we can use the map to identify nodes providing a specific service (e.g.
 
 Communication between parties
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-``FlowLogic`` instances communicate using three functions:
 
-* ``send(otherParty: Party, payload: Any)``
-    * Sends the ``payload`` object to the ``otherParty``
-* ``receive(receiveType: Class<R>, otherParty: Party)``
-    * Receives an object of type ``receiveType`` from the ``otherParty``
-* ``sendAndReceive(receiveType: Class<R>, otherParty: Party, payload: Any)``
-    * Sends the ``payload`` object to the ``otherParty``, and receives an object of type ``receiveType`` back
+In order to create a communication session between your initiator flow and the receiver flow you must call
+``initiateFlow(party: Party): FlowSession``
+
+``FlowSession`` instances in turn provide three functions:
+
+* ``send(payload: Any)``
+    * Sends the ``payload`` object
+* ``receive(receiveType: Class<R>): R``
+    * Receives an object of type ``receiveType``
+* ``sendAndReceive(receiveType: Class<R>, payload: Any): R``
+    * Sends the ``payload`` object and receives an object of type ``receiveType`` back
+
+
+InitiateFlow
+~~~~~~~~~~~~
+
+``initiateFlow`` creates a communication session with the passed in ``Party``.
+
+
+.. container:: codeset
+
+    .. literalinclude:: ../../docs/source/example-code/src/main/kotlin/net/corda/docs/FlowCookbook.kt
+        :language: kotlin
+        :start-after: DOCSTART initiateFlow
+        :end-before: DOCEND initiateFlow
+        :dedent: 12
+
+    .. literalinclude:: ../../docs/source/example-code/src/main/java/net/corda/docs/FlowCookbookJava.java
+        :language: java
+        :start-after: DOCSTART initiateFlow
+        :end-before: DOCEND initiateFlow
+        :dedent: 12
+
+Note that at the time of call to this function no actual communication is done, this is deferred to the first
+send/receive, at which point the counterparty will either:
+
+1. Ignore the message if they are not registered to respond to messages from this flow.
+2. Start the flow they have registered to respond to this flow.
 
 Send
 ~~~~
-We can send arbitrary data to a counterparty:
+
+Once we have a ``FlowSession`` object we can send arbitrary data to a counterparty:
 
 .. container:: codeset
 
@@ -297,12 +328,7 @@ We can send arbitrary data to a counterparty:
         :end-before: DOCEND 4
         :dedent: 12
 
-If this is the first ``send``, the counterparty will either:
-
-1. Ignore the message if they are not registered to respond to messages from this flow.
-2. Start the flow they have registered to respond to this flow, and run the flow until the first call to ``receive``,
-   at which point they process the message. In other words, we are assuming that the counterparty is registered to
-   respond to this flow, and has a corresponding ``receive`` call.
+The flow on the other side must eventually reach a corresponding ``receive`` call to get this message.
 
 Receive
 ~~~~~~~
@@ -350,6 +376,11 @@ as it likes, and each party can invoke a different response flow:
         :start-after: DOCSTART 6
         :end-before: DOCEND 6
         :dedent: 12
+
+.. warning:: If you initiate several counter flows from the same ``@InitiatingFlow`` flow then on the receiving side you
+   must be prepared to be initiated by any of the corresponding ``initiateFlow()`` calls! A good way of handling this
+   ambiguity is to send as a first message a "role" object to the initiated flow, which will thus know which part of the
+   initiating flow it should conform to.
 
 SendAndReceive
 ~~~~~~~~~~~~~~
