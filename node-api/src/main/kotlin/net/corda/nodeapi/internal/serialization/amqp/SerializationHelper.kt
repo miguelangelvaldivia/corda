@@ -1,5 +1,7 @@
 package net.corda.nodeapi.internal.serialization.amqp
 
+import net.corda.core.serialization.ClassWhitelist
+import net.corda.core.serialization.CordaSerializable
 import com.google.common.primitives.Primitives
 import com.google.common.reflect.TypeToken
 import net.corda.core.serialization.SerializationContext
@@ -123,7 +125,7 @@ private fun exploreType(type: Type?, interfaces: MutableSet<Type>, serializerFac
     val clazz = type?.asClass()
     if (clazz != null) {
         if (clazz.isInterface) {
-            if(serializerFactory.isNotWhitelisted(clazz)) return // We stop exploring once we reach a branch that has no `CordaSerializable` annotation or whitelisting.
+            if(serializerFactory.whitelist.isNotWhitelisted(clazz)) return // We stop exploring once we reach a branch that has no `CordaSerializable` annotation or whitelisting.
             else interfaces += type
         }
         for (newInterface in clazz.genericInterfaces) {
@@ -237,4 +239,22 @@ internal fun suitableForObjectReference(type: Type): Boolean {
  */
 internal enum class CommonPropertyNames {
     IncludeInternalInfo,
+}
+
+fun ClassWhitelist.whitelisted(type: Type) {
+    val clazz = type.asClass()!!
+    if (isNotWhitelisted(clazz)) {
+        throw NotSerializableException("Class $type is not on the whitelist or annotated with @CordaSerializable.")
+    }
+}
+
+// Ignore SimpleFieldAccess as we add it to anything we build in the carpenter.
+internal fun ClassWhitelist.isNotWhitelisted(clazz: Class<*>) =
+    !(hasListed(clazz) || hasAnnotationInHierarchy(clazz))
+
+// Recursively check the class, interfaces and superclasses for our annotation.
+fun ClassWhitelist.hasAnnotationInHierarchy(type: Class<*>): Boolean {
+    return type.isAnnotationPresent(CordaSerializable::class.java)
+            || type.interfaces.any { hasAnnotationInHierarchy(it) }
+            || (type.superclass != null && hasAnnotationInHierarchy(type.superclass))
 }

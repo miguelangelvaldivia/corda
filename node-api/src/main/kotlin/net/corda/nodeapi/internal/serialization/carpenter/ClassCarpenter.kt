@@ -2,6 +2,9 @@ package net.corda.nodeapi.internal.serialization.carpenter
 
 import net.corda.core.serialization.ClassWhitelist
 import net.corda.core.serialization.CordaSerializable
+import net.corda.nodeapi.internal.serialization.amqp.hasAnnotationInHierarchy
+import net.corda.nodeapi.internal.serialization.amqp.isNotWhitelisted
+import net.corda.nodeapi.internal.serialization.amqp.whitelisted
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes.*
@@ -17,6 +20,7 @@ import java.util.*
  * as if `this.class.getMethod("get" + name.capitalize()).invoke(this)` had been called. It is intended as a more
  * convenient alternative to reflection.
  */
+@CordaSerializable
 interface SimpleFieldAccess {
     operator fun get(name: String): Any?
 }
@@ -163,8 +167,13 @@ class ClassCarpenter(cl: ClassLoader = Thread.currentThread().contextClassLoader
             val superName = schema.superclass?.jvmName ?: jlObject
             val interfaces = schema.interfaces.map { it.name.jvm }.toMutableList()
 
-            if (SimpleFieldAccess::class.java !in schema.interfaces) {
+            if (SimpleFieldAccess::class.java !in schema.interfaces &&
+                    schema.flags.getOrDefault(SchemaFlags.NoSimpleFieldAccess, "false") == true) {
+                println ("adding no simple")
                 interfaces.add(SimpleFieldAccess::class.java.name.jvm)
+            }
+            else {
+                println ("not adding it")
             }
 
             cw.apply {
@@ -395,7 +404,14 @@ class ClassCarpenter(cl: ClassLoader = Thread.currentThread().contextClassLoader
         if (schema.name in _loaded) throw DuplicateNameException()
         fun isJavaName(n: String) = n.isNotBlank() && isJavaIdentifierStart(n.first()) && n.all(::isJavaIdentifierPart)
         require(isJavaName(schema.name.split(".").last())) { "Not a valid Java name: ${schema.name}" }
-        schema.fields.keys.forEach { require(isJavaName(it)) { "Not a valid Java name: $it" } }
+        schema.fields.forEach {
+            require(isJavaName(it.key)) { "Not a valid Java name: $it" }
+            println ("${it.value.field} = ${whitelist.isNotWhitelisted(it.value.field)}")
+            println ("has listed ${whitelist.hasListed(it.value.field)}")
+            println ("has annotation ${whitelist.hasAnnotationInHierarchy(it.value.field)}")
+            whitelist.whitelisted(it.value.field)
+        }
+
         // Now check each interface we've been asked to implement, as the JVM will unfortunately only catch the
         // fact that we didn't implement the interface we said we would at the moment the missing method is
         // actually called, which is a bit too dynamic for my tastes.

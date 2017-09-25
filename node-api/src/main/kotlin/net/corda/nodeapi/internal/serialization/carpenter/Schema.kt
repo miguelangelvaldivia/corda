@@ -4,6 +4,10 @@ import kotlin.collections.LinkedHashMap
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.Opcodes.*
 
+enum class SchemaFlags {
+    NoSimpleFieldAccess
+}
+
 /**
  * A Schema is the representation of an object the Carpenter can contsruct
  *
@@ -17,7 +21,8 @@ abstract class Schema(
         var fields: Map<String, Field>,
         val superclass: Schema? = null,
         val interfaces: List<Class<*>> = emptyList(),
-        updater: (String, Field) -> Unit) {
+        updater: (String, Field) -> Unit,
+        var flags : MutableMap<SchemaFlags, Boolean> =  mutableMapOf()) {
     private fun Map<String, Field>.descriptors() = LinkedHashMap(this.mapValues { it.value.descriptor })
 
     init {
@@ -41,6 +46,10 @@ abstract class Schema(
 
     val asArray: String
         get() = "[L$jvmName;"
+
+    fun setNoSimpleFieldAccess() {
+        flags.replace (SchemaFlags.NoSimpleFieldAccess, true)
+    }
 }
 
 /**
@@ -51,7 +60,7 @@ class ClassSchema(
         fields: Map<String, Field>,
         superclass: Schema? = null,
         interfaces: List<Class<*>> = emptyList()
-) : Schema(name, fields, superclass, interfaces, { name, field -> field.name = name }) {
+) : Schema(name, fields, superclass, interfaces, { n, f -> f.name = n }) {
     override fun generateFields(cw: ClassWriter) {
         cw.apply { fields.forEach { it.value.generateField(this) } }
     }
@@ -66,7 +75,7 @@ class InterfaceSchema(
         fields: Map<String, Field>,
         superclass: Schema? = null,
         interfaces: List<Class<*>> = emptyList()
-) : Schema(name, fields, superclass, interfaces, { name, field -> field.name = name }) {
+) : Schema(name, fields, superclass, interfaces, { n, f -> f.name = n }) {
     override fun generateFields(cw: ClassWriter) {
         cw.apply { fields.forEach { it.value.generateField(this) } }
     }
