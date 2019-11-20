@@ -174,7 +174,7 @@ dependencies {
     compile 'com.github.bft-smart:library:master-v1.1-beta-g6215ec8-87'
 
     // FastClasspathScanner: classpath scanning
-    compile 'io.github.lukehutch:fast-classpath-scanner:2.0.21'
+    compile 'io.github.lukehutch:fast-classpath-scanner:3.1.15'
 
     // Integration test helpers
     integrationTestCompile "junit:junit:$junit_version"
