@@ -15,7 +15,7 @@ dependencies {
     compile group: 'com.jcraft', name: 'jsch.agentproxy.usocket-jna', version: '0.0.9'
 
     // https://mvnrepository.com/artifact/de.danielbechler/java-object-diff
-    compile group: 'de.danielbechler', name: 'java-object-diff', version: '0.10.2'
+    compile group: 'de.danielbechler', name: 'java-object-diff', version: '0.95'
 
     // TypeSafe Config: for simple and human friendly config files.
     compile "com.typesafe:config:$typesafe_config_version"
