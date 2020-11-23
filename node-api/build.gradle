@@ -22,7 +22,7 @@ dependencies {
     compile "com.typesafe:config:$typesafe_config_version"
 
     // Kryo: object graph serialization.
-    compile "com.esotericsoftware:kryo:4.0.0"
+    compile "com.esotericsoftware:kryo:5.0.1"
     compile "de.javakaffee:kryo-serializers:0.41"
 
     // For AMQP serialisation.
